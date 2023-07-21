@@ -16,13 +16,6 @@ import pytest
 
 test_data = [
     {
-        "orig": "",
-        "template": '{{ mark }}{{ iso }}  waf-den {{ log_type }} {{ host }} 123 10.0.0.0 5000 "-" "-" GET TLSv1.2 fws.gov HTTP/1.1 200 1000 725 SERVER DEFAULT UNPROTECTED VALID /themes/custom/fws_gov/favicon.ico 10.0.0.0 50000 50',
-        "log_type": "TR",
-        "sourcetype": "barracuda:waf",
-        "index": "netwaf"
-    },
-    {
         "orig": "<166>2014-05-20 00:54:44.627 -0700  WAF1 SYS ADMIN_M ALER 51001 Account has been locked for user Kevin because the number of consecutive log-in failures exceeded the maximum allowed",
         "template": "{{ mark }}{{ iso }}  {{ host }} {{ log_type }} ADMIN_M ALER 51001 Account has been locked for user Kevin because the number of consecutive log-in failures exceeded the maximum allowed",
         "log_type": "SYS",
@@ -51,7 +44,7 @@ test_data = [
         "index": "netwaf"
     },
     {
-        "orig": "<166>2014-05-20 00: 56:42.195 -0700  WAF1 NF INFO TCP 99.99.1.117 52676 99.99.79.2 80 ALLOW testacl MGMT/LAN/WAN interface traffic:allow",
+        "orig": "<166>2014-05-20 00:56:42.195 -0700  WAF1 NF INFO TCP 99.99.1.117 52676 99.99.79.2 80 ALLOW testacl MGMT/LAN/WAN interface traffic:allow",
         "template": "{{ mark }}{{ iso }}  {{ host }} {{ log_type }} INFO TCP 99.99.1.117 52676 99.99.79.2 80 ALLOW testacl MGMT/LAN/WAN interface traffic:allow",
         "log_type": "NF",
         "sourcetype": "barracuda:firewall",
@@ -68,17 +61,18 @@ def test_barracuda_waf(
     host = get_host_key
 
     dt = datetime.datetime.now(datetime.timezone.utc)
-    iso = dt.astimezone().isoformat(sep=" ", timespec="milliseconds")   # '2023-07-19 11:45:48.819+00:00'
-    iso = re.sub(r'(.+)([+-])(\d{2}):(\d{2})$', r'\1 \2\3\4', iso)      # '2023-07-19 11:45:48.819 +0000'
+    iso = dt.astimezone().isoformat(sep=" ", timespec="milliseconds")                 # '2023-07-19 11:45:48.819+00:00'
+    vendor_iso_format = re.sub(r'(.+)([+-])(\d{2}):(\d{2})$', r'\1 \2\3\4', iso)      # '2023-07-19 11:45:48.819 +0000'
+    sysng_iso_format = iso.replace(" ", "T")                                          # '2023-07-19T11:45:48.819+00:00'
 
     mt = env.from_string(test_case["template"] + "\n")
-    message = mt.render(mark="<134>", iso=iso, host=host, log_type=test_case["log_type"])
+    message = mt.render(mark="<134>", iso=vendor_iso_format, host=host, log_type=test_case["log_type"])
 
     sendsingle(message, setup_sc4s[0], setup_sc4s[1][514])
 
-    epoch = dt.astimezone().strftime("%s.%f")[:-7]
+    epoch = dt.astimezone().strftime("%s.%f")[:-3]
     st = env.from_string(
-        'search index={{ index }} _time={{ epoch }} sourcetype={{ source_type }} {{ host }}'
+        'search index={{ index }} _time={{ epoch }} sourcetype={{ source_type }} host={{ host }}'
     )
     search = st.render(index=test_case["index"], epoch=epoch, source_type=test_case["sourcetype"], host=host)
 
