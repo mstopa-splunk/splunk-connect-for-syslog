@@ -33,8 +33,7 @@ theme:
 
 nav:
   - Home: "index.md"
-  - Architectural Considerations: "architecture.md"
-  - Load Balancers: "lb.md"
+
   - Getting Started:
       - Read First: "gettingstarted/index.md"
       - Quickstart Guide: "gettingstarted/quickstart_guide.md"
@@ -59,7 +58,21 @@ nav:
       - Read First: "sources/index.md"
       - Basic Onboarding: "sources/base"
       - Known Vendors: "sources/vendor"
-  - Performance: "performance.md"
+
+  - High Availability and Scalability:
+      - Architectural Recommendations: "architecture/recommendations.md"
+      - SC4S Performance:
+        - Check UDP Performance: "architecture/udp_performance_tests.md"
+        - Check TCP Performance: "architecture/tcp_performance_tests.md"
+        - Detect and Troubleshoot Data Losses: "architecture/detect_and_troubleshoot.md"
+      - Choose Your Hardware Setup: "architecture/hardware.md"
+      - Vertical Scaling:
+        - Finetuning for UDP: "architecture/finetuning_for_udp.md"
+        - Finetuning for TCP: "architecture/finetuning_for_tcp.md"
+      - High Availability:
+        - Recommendations: "architecture/ha.md"
+      - Load Balancers: "architecture/lb.md"
+
   - SC4S Lite (Experimental):
       - Intro: "lite.md"
       - Pluggable modules: "pluggable_modules.md"
