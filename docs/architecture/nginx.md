@@ -28,7 +28,7 @@ events {
 }
 ```
 
-## Configure Nginx with the PROXY protocol
+## Option 1: Configure Nginx with the PROXY protocol
 Advantages:
 - easy to set up
 
@@ -46,20 +46,20 @@ stream {
     # Default SC4S TCP ports are 514, 601, 5425, 6514
     # Include also your custom ports
     upstream stream_syslog_514 {
-        server <SC4S_1_IP>:514;
-        server <SC4S_2_IP>:514;
+        server <SC4S_IP_1>:514;
+        server <SC4S_IP_2>:514;
     }
     upstream stream_syslog_601 {
-        server <SC4S_1_IP>:601;
-        server <SC4S_2_IP>:601;
+        server <SC4S_IP_1>:601;
+        server <SC4S_IP_2>:601;
     }
     upstream stream_syslog_5425 {
-        server <SC4S_1_IP>:5425;
-        server <SC4S_2_IP>:5425;
+        server <SC4S_IP_1>:5425;
+        server <SC4S_IP_2>:5425;
     }
     upstream stream_syslog_6514 {
-        server <SC4S_1_IP>:6514;
-        server <SC4S_2_IP>:6514;
+        server <SC4S_IP_1>:6514;
+        server <SC4S_IP_2>:6514;
     }
 
     # Define a common configuration block for all servers
@@ -67,7 +67,6 @@ stream {
         514   stream_syslog_514;
         601   stream_syslog_601;
         5425  stream_syslog_5425;
-        6514  stream_syslog_6514;
     }
 
     # Define a virtual server for each upstream connection
@@ -76,19 +75,24 @@ stream {
         listen        514;
         listen        601;
         listen        5425;
-        listen        6514;
         proxy_pass    $upstream_name;
         
         proxy_timeout 3s;
         proxy_connect_timeout 3s;
         
         proxy_protocol on;
+    }
 
-        # Enable SSL only on port 6514
-        ssl_preread on;
-        if ($server_port = 6514) {
-            proxy_ssl on;
-        }
+    server {
+        listen        6514;
+        proxy_pass    stream_syslog_6514;
+        
+        proxy_timeout 3s;
+        proxy_connect_timeout 3s;
+        
+        proxy_protocol on;
+        
+        proxy_ssl on;
     }
 }
 ```
@@ -99,7 +103,7 @@ stream {
 SC4S_SOURCE_PROXYCONNECT=yes
 ```
 
-## Test your setup
+### Test your setup
 1. Send TCP/TLS messages to the load balancer and ensure that they are being correctly received in Splunk with the correct host IP:
 ```bash
 echo "hello world" | netcat <LB_IP> 514
@@ -113,3 +117,59 @@ echo "hello world" | netcat <LB_IP> 514
 | Load Balancer  | 5,996,000 (99,089.03 msg/sec) | 6,046,000 (99,917.23 msg/sec)  |
 
 
+## Option 2: Configure Nginx with DSR (Direct Server Return)
+Advantages:
+- works for UDP
+- more efficient (saves one hop)
+
+Disadvantages:
+- DSR setup requires active health checks, because LB cannot expect responses from the upstream. Active health checks are not available in Nginx open source. Switch to Nginx Plus or implement your own active health checking
+- requires superuser privileges
+- for cloud users might require disabling Source/Destination Checking (tested with AWS)
+
+1. In the main Nginx configuration update `user` to root, for example:
+`/etc/nginx/nginx.conf`
+```conf
+user root;
+```
+
+2. Add a configuration similar to the following:
+`/etc/nginx/modules-enabled/sc4s.conf`
+```conf
+stream {
+    # Define upstream for each of SC4S hosts and ports
+    # Default SC4S UDP port is 514
+    # Include also your custom ports
+    upstream stream_syslog_514 {
+        server <SC4S_IP_1>:514;
+        server <SC4S_IP_2>:514;
+    }
+
+    # Define connections to each of your upstreams.
+    # Make sure to include `proxy_bind` and `proxy_responses 0`.
+    server {
+        listen        514 udp;
+        proxy_pass    stream_syslog_514;
+        
+        proxy_bind $remote_addr:$remote_port transparent;
+        proxy_responses 0;
+    }
+}
+```
+
+3. Refer to Nginx documentation to find the command to reload the service, for example `sudo nginx -s reload`.
+
+4. Make sure to disable `Source/Destination Checking` if you work on AWS
+
+### Test your setup
+1. Send UDP messages to the load balancer and ensure that they are being correctly received in Splunk with the correct host IP:
+```bash
+echo "hello world" > /dev/udp/<LB_IP>/514
+```
+
+2. Run performance tests
+| Receiver       | Maximum EPS without drops |
+|----------------|---------------------------|
+| Server 1       |                           |
+| Server 2       |                           |
+| LB             |                           |
