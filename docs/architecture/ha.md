@@ -1,1 +1,3 @@
 Load balancing for high availability does not work well for stateless, unacknowledged syslog traffic. More data is preserved when you use a more simple design such as vMotioned VMs.  With syslog, the protocol itself is prone to loss, and syslog data collection can be made "mostly available" at best.
+
+The best deployment model for high availability is a [Microk8s](https://microk8s.io/) based deployment with MetalLB in BGP mode. This model uses a special class of load balancer that is implemented as destination network translation.

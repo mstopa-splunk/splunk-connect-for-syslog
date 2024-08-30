@@ -71,7 +71,9 @@ nav:
         - Finetuning for TCP: "architecture/finetuning_for_tcp.md"
       - High Availability:
         - Recommendations: "architecture/ha.md"
-      - Load Balancers: "architecture/lb.md"
+      - Load Balancers:
+        - Recommendations: "architecture/lb.md"
+        - Nginx: "architecture/nginx.md"
 
   - SC4S Lite (Experimental):
       - Intro: "lite.md"
