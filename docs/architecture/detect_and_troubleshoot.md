@@ -1,0 +1,1 @@
+`sudo tcpdump -n -s 0 -S -i any -A -v 'port 514 and (tcp or udp)'`
