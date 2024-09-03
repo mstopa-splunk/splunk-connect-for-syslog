@@ -1,15 +1,10 @@
 # Nginx
-While using a bare Nginx load balancing is neither a recommended, nor a supported solution, it is still a "good enough" solution for some customers.
+While load balancing syslog with NGINX Open Source is neither recommended, nor supported by Splunk, it is still a "good enough" solution for some customers.
 
-It is a free and open source solution, well documented and with a big and active community of users.
-The open source version of Nginx doesn't provide High Availability, so in fact an nginx LB becomes a new single point of failure. Even with the round-robin we also often observe bias in traffic distribution which results in overloading some of the instances in the pool. As the result customers report memory and disk issues, growing queues and delays in processing.
-
-## Preserving source IP
-| Method                     | Protocol   |
-|----------------------------|------------|
-| PROXY protocol             | TCP/TLS    |
-| Transparent IP             | TCP/TLS    |
-| Direct Server Return (DSR) | UDP        |
+Note the main disadvantages of Nginx Open Source:
+- Due to no High Availability an Nginx LB becomes a new single point of failure.
+- Even with the round-robin we also often observe bias in traffic distribution which results in overloading some of the instances in the pool. This results in growing queues, which lead to delays, data drops and memory and disk issues.
+- Nginx Open Source doesn't provide active health checking, which is crucial for UDP DSR (Direct Server Return) load balancing.
 
 ## Install Nginx
 1. Refer to Nginx documentation for instructions on installing Nginx **with the stream module**, which is necessary for TCP/UDP load balancing. For example on Ubuntu:
@@ -27,6 +22,13 @@ events {
     use epoll;
 }
 ```
+
+## Preserving source IP
+| Method                     | Protocol   |
+|----------------------------|------------|
+| PROXY protocol             | TCP/TLS    |
+| Transparent IP             | TCP/TLS    |
+| Direct Server Return (DSR) | UDP        |
 
 ## Option 1: Configure Nginx with the PROXY protocol
 Advantages:
@@ -110,11 +112,10 @@ echo "hello world" | netcat <LB_IP> 514
 ```
 
 2. Run performance tests based on [Check TCP Performance](tcp_performance_tests.md)
-| Receiver       | Same Subnet                   | WAN                            |
-|----------------|-------------------------------|--------------------------------|
-| Server 1       | 4,410,000 (72,879.48 msg/sec) | 4,280,000 (70,726.90 msg/sec)  |
-| Server 2       | 4,341,000 (71,738.98 msg/sec) | 4,255,000 (70,316.86 msg/sec)  |
-| Load Balancer  | 5,996,000 (99,089.03 msg/sec) | 6,046,000 (99,917.23 msg/sec)  |
+| Receiver                   | Performance                   |
+|----------------------------|-------------------------------|
+| Single SC4S Server         | 4,341,000 (71,738.98 msg/sec) |
+| Load Balancer + 2 Servers  | 5,996,000 (99,089.03 msg/sec) |
 
 
 ## Option 2: Configure Nginx with DSR (Direct Server Return)
@@ -159,7 +160,7 @@ stream {
 
 3. Refer to Nginx documentation to find the command to reload the service, for example `sudo nginx -s reload`.
 
-4. Make sure to disable `Source/Destination Checking` if you work on AWS
+4. Make sure to disable `Source/Destination Checking` on your LB's host if you work on AWS
 
 ### Test your setup
 1. Send UDP messages to the load balancer and ensure that they are being correctly received in Splunk with the correct host IP:
@@ -168,8 +169,10 @@ echo "hello world" > /dev/udp/<LB_IP>/514
 ```
 
 2. Run performance tests
-| Receiver       | Maximum EPS without drops |
-|----------------|---------------------------|
-| Server 1       |                           |
-| Server 2       |                           |
-| LB             |                           |
+
+| Receiver / Drops Rate for EPS (msgs/sec) | 4,500  | 9,000  | 27,000 | 50,000 | 150,000 | 300,000 |
+|------------------------------------------|--------|--------|--------|--------|---------|---------|
+| Single SC4S Server                       | 0.33%  | 1.24%  | 52.31% | 74.71% |    --   |    --   |
+| Load Balancer + 2 Servers                | 1%     | 1.19%  | 6.11%  | 47.64% |    --   |    --   |
+| Single Finetuned SC4S Server             | 0%     | 0%     | 0%     | 0%     |  47.37% |    --   |
+| Load Balancer + 2 Finetuned Servers      | 0.98%  | 1.14%  | 1.05%  | 1.16%  |  3.56%  |  55.54% |
